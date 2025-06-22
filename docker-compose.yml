@@ -1,0 +1,79 @@
+version: '3.9'
+
+services:
+  nodo0:
+    build: .
+    container_name: nodo0
+    depends_on:
+      - nodo2
+    environment:
+      ID_NODO: "0"
+      IP_NODO: "172.28.1.10"
+      PORT_NODO: "5001"
+      IP_VM1: "172.28.1.10"
+      IP_VM2: "172.28.1.11"
+      IP_VM3: "172.28.1.12"
+      PORT_VM1: "5001"
+      PORT_VM2: "5002"
+      PORT_VM3: "5003"
+      IS_PRIMARY: "false"
+    volumes:
+      - ./nodo.json:/app/nodo.json
+    ports:
+      - "5001:5001"
+    networks:
+      red-nodos:
+        ipv4_address: 172.28.1.10
+
+  nodo1:
+    build: .
+    container_name: nodo1
+    depends_on:
+      - nodo2
+    environment:
+      ID_NODO: "1"
+      IP_NODO: "172.28.1.11"
+      PORT_NODO: "5002"
+      IP_VM1: "172.28.1.10"
+      IP_VM2: "172.28.1.11"
+      IP_VM3: "172.28.1.12"
+      PORT_VM1: "5001"
+      PORT_VM2: "5002"
+      PORT_VM3: "5003"
+      IS_PRIMARY: "false"
+    volumes:
+      - ./nodo.json:/app/nodo.json
+    ports:
+      - "5002:5002"
+    networks:
+      red-nodos:
+        ipv4_address: 172.28.1.11
+
+  nodo2:
+    build: .
+    container_name: nodo2
+    environment:
+      ID_NODO: "2"
+      IP_NODO: "172.28.1.12"
+      PORT_NODO: "5003"
+      IP_VM1: "172.28.1.10"
+      IP_VM2: "172.28.1.11"
+      IP_VM3: "172.28.1.12"
+      PORT_VM1: "5001"
+      PORT_VM2: "5002"
+      PORT_VM3: "5003"
+      IS_PRIMARY: "true"
+    volumes:
+      - ./nodo.json:/app/nodo.json
+    ports:
+      - "5003:5003"
+    networks:
+      red-nodos:
+        ipv4_address: 172.28.1.12
+
+networks:
+  red-nodos:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16

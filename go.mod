@@ -1,4 +1,4 @@
-module main
+module SD-Tarea-3
 
 go 1.24.4
 

@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+option go_package = "/proto";
+
+package proto;
+
+service NodoService {
+  rpc SendBall(BallRequest) returns (BallResponse);
+}
+
+message BallRequest {
+  string from_id = 1;
+}
+
+message BallResponse {
+  string message = 1;
+}
