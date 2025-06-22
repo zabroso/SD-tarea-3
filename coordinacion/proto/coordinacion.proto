@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package coordinacion;
+
+option go_package = "./proto";
+
+service NodeService {
+  rpc Election (ElectionRequest) returns (ElectionResponse);
+  rpc Coordinator (CoordinatorMessage) returns (Empty);
+}
+
+message ElectionRequest {
+  int32 sender_id = 1;
+}
+
+message ElectionResponse {
+  bool ok = 1;
+}
+
+message CoordinatorMessage {
+  int32 coordinator_id = 1;
+}
+
+message Empty {}
