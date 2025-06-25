@@ -1,8 +1,9 @@
-package main
+package coordinacion
 
 import (
+	"SD-Tarea-3/coordinacion/gen/proto"
+	"SD-Tarea-3/models"
 	"context"
-	"coordinacion/gen/proto"
 	"fmt"
 	"log"
 	"os"
@@ -12,13 +13,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
-
-type Bully struct {
-	ID       int
-	Peers    map[int]string // Mapa: ID → dirección IP:puerto
-	LeaderID int
-	IsLeader bool
-}
 
 func getEnv(key string) string {
 
@@ -32,7 +26,7 @@ func getEnv(key string) string {
 	return os.Getenv(key)
 }
 
-func (b *Bully) startElection() {
+func (b *models.Bully) startElection() {
 	// This function would contain the logic for the bully algorithm
 	// For now, we will just log that the function was called
 	log.Println("Bully algorithm executed")

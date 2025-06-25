@@ -10,26 +10,17 @@ import (
 	"net"
 	"os"
 	"strconv"
-	"sync"
 	"time"
 
+	"SD-Tarea-3/models"
+	"SD-Tarea-3/monitoreo"
 	"SD-Tarea-3/proto"
 
 	"github.com/joho/godotenv"
 	"google.golang.org/grpc"
 )
 
-type Nodo struct {
-	ID             string   `json:"id"`
-	IsPrimary      bool     `json:"is_primary"`
-	LastMessage    string   `json:"last_message"`
-	SequenceNumber int      `json:"sequence_number"`
-	EventLog       []string `json:"event_log"`
-	Port           int      `json:"port"`
-	mu             sync.Mutex
-}
-
-var estado *Nodo
+var estado *models.Nodo
 var nodoID string
 var ipMap map[string]string
 var portMap map[string]string
@@ -114,6 +105,16 @@ func main() {
 			}
 		}()
 		continuarCiclo <- struct{}{}
+	} else {
+		destino := fmt.Sprintf("%s:%s", ipMap["nodo2"], portMap["nodo2"])
+		conn, err := grpc.Dial(destino, grpc.WithInsecure())
+		if err != nil {
+			log.Printf("Error al conectar con %s: %v", destino, err)
+			// Activar algoritmo del maton
+		}
+		defer conn.Close()
+
+		monitoreo.HeartBeat(conn, estado, destino)
 	}
 
 	select {}
