@@ -6,6 +6,9 @@ package proto;
 
 service NodoService {
   rpc SendBall(BallRequest) returns (BallResponse);
+  rpc HeartBeat(BeatRequest) returns (BeatResponse);
+  rpc Election (ElectionRequest) returns (ElectionResponse);
+  rpc Coordinator (CoordinatorMessage) returns (Empty);
 }
 
 message BallRequest {
@@ -16,14 +19,27 @@ message BallResponse {
   string message = 1;
 }
 
-service NodoHeartBeat {
-  rpc HeartBeat(BeatRequest) returns (BeatResponse);
-}
-
 message BeatRequest {
   string from_id = 1;
+  string message = 2;
 }
 
 message BeatResponse {
   string from_id = 1;
+  string message = 2;
+  bool is_primary = 3;
 }
+
+message ElectionRequest {
+  int32 sender_id = 1;
+}
+
+message ElectionResponse {
+  bool ok = 1;
+}
+
+message CoordinatorMessage {
+  int32 coordinator_id = 1;
+}
+
+message Empty {}

@@ -9,5 +9,5 @@ type Nodo struct {
 	SequenceNumber int      `json:"sequence_number"`
 	EventLog       []string `json:"event_log"`
 	Port           int      `json:"port"`
-	mu             sync.Mutex
+	Mu             sync.Mutex
 }

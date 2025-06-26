@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"time"
 
+	"SD-Tarea-3/coordinacion"
 	"SD-Tarea-3/models"
 	"SD-Tarea-3/monitoreo"
 	"SD-Tarea-3/proto"
@@ -21,9 +22,11 @@ import (
 )
 
 var estado *models.Nodo
-var nodoID string
+var bully *models.Bully
+var nodes map[int]string // Mapa de nodos: ID → dirección IP:puerto
+var nodoID int
+var primaryNodeID int
 var ipMap map[string]string
-var portMap map[string]string
 var continuarCiclo = make(chan struct{})
 
 func main() {
@@ -31,22 +34,17 @@ func main() {
 		log.Fatal("Error cargando .env")
 	}
 
-	nodoIDInt, err := strconv.Atoi(os.Getenv("ID_NODO"))
+	nodoID, err := strconv.Atoi(os.Getenv("ID_NODO"))
 	if err != nil {
 		log.Fatalf("ID_NODO inválido: %v", err)
 	}
 
-	nodoID = fmt.Sprintf("nodo%d", nodoIDInt)
+	nodes[nodoID] = os.Getenv("IP_VM") + ":" + os.Getenv("PORT_VM")
 
 	ipMap = map[string]string{
-		"nodo0": os.Getenv("IP_VM1"),
-		"nodo1": os.Getenv("IP_VM2"),
-		"nodo2": os.Getenv("IP_VM3"),
-	}
-	portMap = map[string]string{
-		"nodo0": os.Getenv("PORT_VM1"),
-		"nodo1": os.Getenv("PORT_VM2"),
-		"nodo2": os.Getenv("PORT_VM3"),
+		"nodo0": os.Getenv("IP_VM1") + ":" + os.Getenv("PORT_VM1"),
+		"nodo1": os.Getenv("IP_VM2") + ":" + os.Getenv("PORT_VM2"),
+		"nodo2": os.Getenv("IP_VM3") + ":" + os.Getenv("PORT_VM3"),
 	}
 
 	rutaJson := fmt.Sprintf("nodo_%s.json", os.Getenv("ID_NODO"))
@@ -65,6 +63,8 @@ func main() {
 
 	time.Sleep(2 * time.Second)
 
+	GetIds()
+
 	if estado.IsPrimary {
 		go func() {
 			for {
@@ -74,12 +74,11 @@ func main() {
 
 				// Crear lista de nodos destino
 				var candidatos []string
-				for nodo, puerto := range portMap {
-					puertoInt, err := strconv.Atoi(puerto)
+				for nodo, direccion := range ipMap {
 					if err != nil {
 						continue
 					}
-					if puertoInt != estado.Port {
+					if direccion != nodes[nodoID] {
 						candidatos = append(candidatos, nodo)
 					}
 				}
@@ -91,7 +90,7 @@ func main() {
 					destinoNodo = candidatos[1]
 				}
 
-				destino := fmt.Sprintf("%s:%s", ipMap[destinoNodo], portMap[destinoNodo])
+				destino := ipMap[destinoNodo]
 				fmt.Printf("Enviando pelota a %s (%s)...\n", destinoNodo, destino)
 
 				ok := enviarPelota(destino, estado.ID)
@@ -106,15 +105,21 @@ func main() {
 		}()
 		continuarCiclo <- struct{}{}
 	} else {
-		destino := fmt.Sprintf("%s:%s", ipMap["nodo2"], portMap["nodo2"])
+		destino := nodes[primaryNodeID]
 		conn, err := grpc.Dial(destino, grpc.WithInsecure())
 		if err != nil {
 			log.Printf("Error al conectar con %s: %v", destino, err)
 			// Activar algoritmo del maton
+
+			bully.ID = nodoID
+			bully.Nodes = nodes
+			bully.LeaderID = primaryNodeID
+
+			coordinacion.StartElection(bully)
 		}
 		defer conn.Close()
-
-		monitoreo.HeartBeat(conn, estado, destino)
+		monitoreo.SetEstado(estado)
+		monitoreo.ListenHeartBeat(conn, destino, bully, nodes)
 	}
 
 	select {}
@@ -149,7 +154,7 @@ func (s *server) SendBall(ctx context.Context, req *proto.BallRequest) (*proto.B
 		}
 
 		if !estado.IsPrimary {
-			destino := fmt.Sprintf("%s:%s", ipMap["nodo2"], portMap["nodo2"])
+			destino := fmt.Sprintf("%s", ipMap["nodo2"])
 			enviarPelota(destino, estado.ID)
 		} else {
 			continuarCiclo <- struct{}{}
@@ -170,6 +175,57 @@ func ejecutarSimulacion() {
 	for _, e := range eventos {
 		time.Sleep(1 * time.Second)
 		agregarEvento(e)
+	}
+}
+
+func (s *server) Election(ctx context.Context, req *proto.ElectionRequest) (*proto.ElectionResponse, error) {
+	log.Printf("Recibida petición de elección de nodo %d", req.SenderId)
+
+	// Aquí puedes implementar lógica para decidir si respondes OK o no
+	return &proto.ElectionResponse{Ok: true}, nil
+}
+
+func (s *server) HeartBeat(ctx context.Context, req *proto.BeatRequest) (*proto.BeatResponse, error) {
+	log.Printf("Recibido HeartBeat de %s: %s", req.FromId, req.Message)
+
+	estado.LastMessage = time.Now().Format(time.RFC3339)
+
+	return &proto.BeatResponse{FromId: estado.ID, Message: "Ok", IsPrimary: estado.IsPrimary}, nil
+}
+
+func GetIds() {
+	for nodo, direccion := range ipMap {
+		if direccion != nodes[nodoID] {
+			conn, err := grpc.NewClient(direccion)
+			if err != nil {
+				log.Printf("Error al conectar con %s: %v", nodo, err)
+				continue
+			}
+
+			defer conn.Close()
+
+			client := proto.NewNodoServiceClient(conn)
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+
+			resp, err := client.HeartBeat(ctx, &proto.BeatRequest{FromId: estado.ID, Message: "Acknowledged"})
+			if err != nil {
+				log.Printf("Error al enviar HeartBeat a %s: %v", nodo, err)
+				continue
+			}
+			peerNodeId, err := strconv.Atoi(resp.FromId)
+			if err != nil {
+				log.Printf("Error al convertir FromId a entero: %v", err)
+				continue
+			}
+			nodes[peerNodeId] = direccion
+			if resp.IsPrimary {
+				primaryNodeID = peerNodeId
+				log.Printf("Nodo %d es el coordinador", primaryNodeID)
+			} else {
+				log.Printf("Nodo %d no es el coordinador", peerNodeId)
+			}
+		}
 	}
 }
 
@@ -196,8 +252,8 @@ func enviarPelota(destino string, desde string) bool {
 }
 
 func agregarEvento(mensaje string) {
-	estado.mu.Lock()
-	defer estado.mu.Unlock()
+	estado.Mu.Lock()
+	defer estado.Mu.Unlock()
 	estado.SequenceNumber++
 	estado.LastMessage = mensaje
 	estado.EventLog = append(estado.EventLog, fmt.Sprintf("[#%d] %s", estado.SequenceNumber, mensaje))
@@ -205,12 +261,12 @@ func agregarEvento(mensaje string) {
 	fmt.Println(mensaje)
 }
 
-func cargarEstado(path string) *Nodo {
+func cargarEstado(path string) *models.Nodo {
 	file, err := os.ReadFile(path)
 	if err != nil {
 		panic(err)
 	}
-	var n Nodo
+	var n models.Nodo
 	if err := json.Unmarshal(file, &n); err != nil {
 		panic(err)
 	}

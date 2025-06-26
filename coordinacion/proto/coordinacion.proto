@@ -4,7 +4,7 @@ package coordinacion;
 
 option go_package = "./proto";
 
-service NodeService {
+service BullyService {
   rpc Election (ElectionRequest) returns (ElectionResponse);
   rpc Coordinator (CoordinatorMessage) returns (Empty);
 }
