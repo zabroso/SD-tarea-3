@@ -40,4 +40,5 @@ func ListenHeartBeat(conn *grpc.ClientConn, destino string, bully *models.Bully,
 
 func SetEstado(estadoNodo *models.Nodo) {
 	estado = estadoNodo
+	log.Printf("Estado del nodo actualizado: ID=%s", estado.ID)
 }
