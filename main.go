@@ -18,7 +18,6 @@ import (
 
 	"github.com/joho/godotenv"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 var estado *models.Nodo
@@ -123,10 +122,20 @@ func main() {
 					bully.LeaderID = primaryNodeID
 
 					coordinacion.StartElection(bully)
+					continue
 				}
-				conn.Close()
+
 				monitoreo.SetEstado(estado)
-				monitoreo.ListenHeartBeat(conn, destino, bully, nodes)
+				ok := monitoreo.ListenHeartBeat(conn, destino, bully, nodes)
+				conn.Close()
+
+				if !ok {
+					log.Println("Fallo al enviar la pelota. Esperando para intentar de nuevo...")
+					// Opcional: reintentar luego de un tiempo
+					time.AfterFunc(5*time.Second, func() {
+						continuarCiclo <- struct{}{}
+					})
+				}
 			}
 
 		}()
@@ -159,7 +168,6 @@ type server struct {
 
 func (s *server) SendBall(ctx context.Context, req *proto.BallRequest) (*proto.BallResponse, error) {
 	log.Printf("Recibida pelota de %s", req.FromId)
-	log.Printf("Nodo %s, %s iniciado. Esperando conexiones...", estado.ID, nodes[nodoID])
 
 	go func() {
 		if !estado.IsPrimary {
@@ -205,11 +213,12 @@ func (s *server) HeartBeat(ctx context.Context, req *proto.BeatRequest) (*proto.
 	return &proto.BeatResponse{FromId: estado.ID, Message: "Ok", IsPrimary: estado.IsPrimary}, nil
 }
 
+// Obtiene las direcciones de los nodos con sus respectivos ids y actualiza la variable `nodes`
 func GetIds() {
 	for nodo, direccion := range ipMap {
 		if direccion != nodes[nodoID] {
 			log.Printf("Direccion en GetIds de %d: %s", nodoID, direccion)
-			conn, err := grpc.NewClient(direccion, grpc.WithTransportCredentials(insecure.NewCredentials()))
+			conn, err := grpc.Dial(direccion, grpc.WithInsecure())
 			if err != nil {
 				log.Printf("Error direccion %s", direccion)
 				log.Printf("Error al conectar con %s: %v", nodo, err)
@@ -220,19 +229,17 @@ func GetIds() {
 
 			client := proto.NewNodoServiceClient(conn)
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
 			log.Printf("Enviando HeartBeat a %s desde %s", nodo, estado.ID)
+
 			resp, err := client.HeartBeat(ctx, &proto.BeatRequest{FromId: estado.ID, Message: "Acknowledged"})
 			if err != nil {
 				log.Printf("Error al enviar HeartBeat a %s: %v", nodo, err)
-				cancel()
-				conn.Close()
 				continue
 			}
 			peerNodeId, err := strconv.Atoi(resp.FromId)
 			if err != nil {
 				log.Printf("Error al convertir FromId a entero: %v", err)
-				cancel()
-				conn.Close()
 				continue
 			}
 			nodes[peerNodeId] = direccion
@@ -242,8 +249,6 @@ func GetIds() {
 			} else {
 				log.Printf("Nodo %d no es el coordinador", peerNodeId)
 			}
-			defer cancel()
-			conn.Close()
 		}
 
 	}

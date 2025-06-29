@@ -55,7 +55,7 @@ func AnnounceCoordinator(b *models.Bully) {
 			continue
 		}
 
-		conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		conn, err := grpc.Dial(address, grpc.WithInsecure())
 		if err != nil {
 			fmt.Printf("Nodo %d no respondió (timeout): %s\n", peerID, address)
 			continue
