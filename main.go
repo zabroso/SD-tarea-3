@@ -49,8 +49,7 @@ func main() {
 		"nodo2": os.Getenv("IP_VM3") + ":" + os.Getenv("PORT_VM3"),
 	}
 
-	rutaJson := fmt.Sprintf("nodo_%s.json", os.Getenv("ID_NODO"))
-	handlers.Estado = cargarEstado(rutaJson)
+	handlers.Estado = cargarEstado("nodo.json")
 	isPrimaryStr := os.Getenv("IS_PRIMARY")
 	handlers.Estado.IsPrimary = isPrimaryStr == "true"
 	handlers.Estado.ID = os.Getenv("ID_NODO")
@@ -59,7 +58,7 @@ func main() {
 		log.Fatalf("PORT_NODO inválido: %v\n", err)
 	}
 
-	fmt.Printf("Estado cargado: %+v\n", handlers.Estado)
+	log.Printf("Estado cargado: %+v\n", handlers.Estado)
 
 	go iniciarServidorGRPC()
 
@@ -72,9 +71,9 @@ func main() {
 	if handlers.Estado.IsPrimary {
 		go func() {
 			for {
-				fmt.Println("Nodo coordinador esperando para enviar pelota...")
+				log.Println("Nodo coordinador esperando para enviar pelota...")
 				<-continuarCiclo
-				fmt.Println("Nodo coordinador. Iniciando ronda de envío aleatorio de pelotas...")
+				log.Println("Nodo coordinador. Iniciando ronda de envío aleatorio de pelotas...")
 
 				// Crear lista de nodos destino
 				var candidatos []int
@@ -92,7 +91,7 @@ func main() {
 				}
 
 				destino := handlers.Nodes[destinoNodo]
-				fmt.Printf("Enviando pelota a %d (%s)...\n", destinoNodo, destino)
+				log.Printf("Enviando pelota a %d (%s)...\n", destinoNodo, destino)
 
 				ok := enviarPelota(destino, handlers.Estado.ID)
 				if !ok {
@@ -292,8 +291,8 @@ func agregarEvento(mensaje string) {
 	handlers.Estado.SequenceNumber++
 	handlers.Estado.LastMessage = mensaje
 	handlers.Estado.EventLog = append(handlers.Estado.EventLog, fmt.Sprintf("[#%d] %s", handlers.Estado.SequenceNumber, mensaje))
-	saveEstado(fmt.Sprintf("/app/nodo_%s.json", handlers.Estado.ID))
-	fmt.Println(mensaje)
+	saveEstado()
+	log.Printf(mensaje)
 }
 
 func cargarEstado(path string) *models.Nodo {
@@ -308,10 +307,16 @@ func cargarEstado(path string) *models.Nodo {
 	return &n
 }
 
-func saveEstado(path string) {
+func saveEstado() {
+	path := "/app/nodo.json"
+
 	data, err := json.MarshalIndent(handlers.Estado, "", "  ")
 	if err != nil {
 		panic(err)
 	}
-	_ = os.WriteFile(path, data, 0644)
+
+	err = os.WriteFile(path, data, 0644)
+	if err != nil {
+		panic(err)
+	}
 }

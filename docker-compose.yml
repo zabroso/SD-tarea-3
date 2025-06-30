@@ -17,8 +17,6 @@ services:
       PORT_VM2: "5002"
       PORT_VM3: "5003"
       IS_PRIMARY: "false"
-    volumes:
-      - ./nodo.json:/app/nodo.json
     ports:
       - "5001:5001"
     networks:
@@ -41,8 +39,6 @@ services:
       PORT_VM2: "5002"
       PORT_VM3: "5003"
       IS_PRIMARY: "false"
-    volumes:
-      - ./nodo.json:/app/nodo.json
     ports:
       - "5002:5002"
     networks:
@@ -63,8 +59,6 @@ services:
       PORT_VM2: "5002"
       PORT_VM3: "5003"
       IS_PRIMARY: "true"
-    volumes:
-      - ./nodo.json:/app/nodo.json
     ports:
       - "5003:5003"
     networks:
