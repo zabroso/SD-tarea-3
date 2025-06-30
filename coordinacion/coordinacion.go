@@ -1,6 +1,7 @@
 package coordinacion
 
 import (
+	"SD-Tarea-3/handlers"
 	"SD-Tarea-3/models"
 	"SD-Tarea-3/proto"
 	"context"
@@ -9,10 +10,9 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
-func StartElection(b *models.Bully) {
+func StartElection(b *models.Bully) map[int]string {
 	log.Println("Bully algorithm executed")
 	receivedOK := false
 
@@ -21,9 +21,10 @@ func StartElection(b *models.Bully) {
 			continue
 		}
 
-		conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		conn, err := grpc.Dial(address, grpc.WithInsecure())
 		if err != nil {
 			fmt.Printf("Nodo %d no respondió (timeout): %s\n", peerID, address)
+			delete(b.Nodes, peerID)
 			continue
 		}
 
@@ -44,10 +45,13 @@ func StartElection(b *models.Bully) {
 		time.Sleep(5 * time.Second)
 	}
 
+	return b.Nodes
+
 }
 
 func AnnounceCoordinator(b *models.Bully) {
 	b.LeaderID = b.ID
+	handlers.NewPrimary()
 	fmt.Printf("Nodo %d se proclama líder\n", b.ID)
 
 	for peerID, address := range b.Nodes {
@@ -55,7 +59,7 @@ func AnnounceCoordinator(b *models.Bully) {
 			continue
 		}
 
-		conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		conn, err := grpc.Dial(address, grpc.WithInsecure())
 		if err != nil {
 			fmt.Printf("Nodo %d no respondió (timeout): %s\n", peerID, address)
 			continue
