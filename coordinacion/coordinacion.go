@@ -12,7 +12,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-func StartElection(b *models.Bully) map[int]string {
+func StartElection(b *models.Bully) {
 	log.Println("Bully algorithm executed")
 	receivedOK := false
 
@@ -24,34 +24,35 @@ func StartElection(b *models.Bully) map[int]string {
 		conn, err := grpc.Dial(address, grpc.WithInsecure())
 		if err != nil {
 			fmt.Printf("Nodo %d no respondió (timeout): %s\n", peerID, address)
-			delete(b.Nodes, peerID)
 			continue
 		}
 
 		client := proto.NewNodoServiceClient(conn)
-		resp, err := client.Election(context.Background(), &proto.ElectionRequest{SenderId: int32(b.ID)})
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		resp, err := client.Election(ctx, &proto.ElectionRequest{SenderId: int32(b.ID)})
 		conn.Close()
 
 		if err == nil && resp.Ok {
 			fmt.Printf("Nodo %d respondió OK\n", peerID)
 			receivedOK = true
+		} else {
+			delete(handlers.Nodes, peerID)
 		}
 	}
 
 	if !receivedOK {
+		handlers.NewPrimary()
 		AnnounceCoordinator(b)
 	} else {
 		fmt.Println("Esperando que otro nodo anuncie al nuevo líder...")
 		time.Sleep(5 * time.Second)
 	}
 
-	return b.Nodes
-
 }
 
 func AnnounceCoordinator(b *models.Bully) {
 	b.LeaderID = b.ID
-	handlers.NewPrimary()
 	fmt.Printf("Nodo %d se proclama líder\n", b.ID)
 
 	for peerID, address := range b.Nodes {
