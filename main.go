@@ -21,12 +21,9 @@ import (
 	"google.golang.org/grpc"
 )
 
-// var estado *models.Nodo
 var bully *models.Bully
-
-// var nodes map[int]string // Mapa de nodos: ID → dirección IP:puerto
 var nodoID int
-var primaryNodeID int = -1
+
 var ipMap map[string]string
 var continuarCiclo = make(chan struct{})
 
@@ -68,89 +65,76 @@ func main() {
 	go GetIds()
 
 	time.Sleep(2 * time.Second)
-
-	if handlers.Estado.IsPrimary {
-		go func() {
-			for {
-				fmt.Println("Nodo coordinador esperando para enviar pelota...")
-				<-continuarCiclo
-				fmt.Println("Nodo coordinador. Iniciando ronda de envío aleatorio de pelotas...")
-
-				// Crear lista de nodos destino
-				var candidatos []int
-				for nodo, direccion := range handlers.Nodes {
-					if direccion != handlers.Nodes[nodoID] {
-						candidatos = append(candidatos, nodo)
-					}
-				}
-
-				var destinoNodo int
-				if rand.Float64() < 0.5 {
-					destinoNodo = candidatos[0]
-				} else {
-					destinoNodo = candidatos[1]
-				}
-
-				destino := handlers.Nodes[destinoNodo]
-				fmt.Printf("Enviando pelota a %d (%s)...\n", destinoNodo, destino)
-
-				ok := enviarPelota(destino, handlers.Estado.ID)
-				if !ok {
-					log.Println("Fallo al enviar la pelota. Esperando para intentar de nuevo...")
-					// Opcional: reintentar luego de un tiempo
-					time.AfterFunc(5*time.Second, func() {
-						continuarCiclo <- struct{}{}
-					})
-				}
+	go func() {
+		for {
+			if handlers.Estado.IsPrimary {
+				funcionalidadPrimario()
+			} else {
+				funcionalidadSecundario()
 			}
-		}()
-		continuarCiclo <- struct{}{}
-	} else {
-		go func() {
-			for {
-				log.Println("Esperando señal para verificar HeartBeat...")
-				<-continuarCiclo
-				destino := handlers.Nodes[primaryNodeID]
-				log.Printf("Destino: %v", destino)
-				conn, err := grpc.Dial(destino, grpc.WithInsecure())
-				if err != nil {
-
-					// Activar algoritmo del maton
-
-					bully.ID = nodoID
-					bully.Nodes = handlers.Nodes
-					bully.LeaderID = primaryNodeID
-
-					newNodes := coordinacion.StartElection(bully)
-					handlers.SetNodes(newNodes)
-					continue
-				}
-
-				ok := monitoreo.ListenHeartBeat(conn, destino, bully, handlers.Nodes)
-				conn.Close()
-
-				if !ok {
-					log.Println("Fallo al escuchar latido. Esperando para intentar de nuevo...")
-					// Opcional: reintentar luego de un tiempo
-					time.AfterFunc(5*time.Second, func() {
-						continuarCiclo <- struct{}{}
-					})
-				} else {
-
-					time.AfterFunc(5*time.Second, func() {
-						continuarCiclo <- struct{}{}
-					})
-				}
-			}
-
-		}()
-		continuarCiclo <- struct{}{}
-
-	}
-
+		}
+	}()
+	continuarCiclo <- struct{}{}
 	select {}
 }
 
+func funcionalidadPrimario() {
+	<-continuarCiclo
+	fmt.Println("Nodo coordinador. Iniciando ronda de envío aleatorio de pelotas...")
+
+	var candidatos []int
+	for nodo, direccion := range handlers.Nodes {
+		if direccion != handlers.Nodes[nodoID] {
+			candidatos = append(candidatos, nodo)
+		}
+	}
+	var destinoNodo int
+	if len(candidatos) > 0 {
+		destinoNodo = candidatos[rand.Intn(len(candidatos))]
+	} else {
+		log.Println("No hay nodos disponibles para enviar la pelota.")
+		return
+	}
+	destino := handlers.Nodes[destinoNodo]
+	fmt.Printf("Enviando pelota a %d (%s)...\n", destinoNodo, destino)
+
+	ok := enviarPelota(destino, handlers.Estado.ID)
+	if !ok {
+		log.Println("Fallo al enviar la pelota. Esperando para intentar de nuevo...")
+		time.AfterFunc(5*time.Second, func() {
+			continuarCiclo <- struct{}{}
+		})
+	}
+}
+
+func funcionalidadSecundario() {
+	<-continuarCiclo
+	log.Println("Esperando señal para verificar HeartBeat...")
+	destino := handlers.Nodes[handlers.PrimaryNodeID]
+	conn, err := grpc.Dial(destino, grpc.WithInsecure())
+	if err != nil {
+		bully.ID = nodoID
+		bully.Nodes = handlers.Nodes
+		bully.LeaderID = handlers.PrimaryNodeID
+
+		coordinacion.StartElection(bully)
+
+		return
+	}
+
+	ok := monitoreo.ListenHeartBeat(conn, destino, bully, handlers.Nodes)
+	conn.Close()
+
+	if !ok {
+		log.Println("Error al recibir HeartBeat.")
+	}
+
+	time.AfterFunc(5*time.Second, func() {
+		continuarCiclo <- struct{}{}
+	})
+}
+
+// Inicia el servidor gRPC y registra el servicio NodoService
 func iniciarServidorGRPC() {
 	ip := os.Getenv("IP_NODO")
 	port := os.Getenv("PORT_NODO")
@@ -209,12 +193,25 @@ func ejecutarSimulacion() {
 	}
 }
 
+// Informa a los nodos del nuevo coordinador
+func (s *server) Coordinator(ctx context.Context, req *proto.CoordinatorMessage) (*proto.Empty, error) {
+	log.Printf("Recibida petición de coordinador de nodo %d", req.CoordinatorId)
+
+	handlers.PrimaryNodeID = int(req.CoordinatorId)
+
+	log.Printf("Nodo %d se ha convertido en coordinador", handlers.PrimaryNodeID)
+
+	return &proto.Empty{}, nil
+}
+
+// Maneja la petición de elección de nodo
 func (s *server) Election(ctx context.Context, req *proto.ElectionRequest) (*proto.ElectionResponse, error) {
 	log.Printf("Recibida petición de elección de nodo %d", req.SenderId)
 
 	return &proto.ElectionResponse{Ok: true}, nil
 }
 
+// Se encarga de verificar que el nodo sigue activo. También es utilizado para obtener los ids de los nodos al inicio
 func (s *server) HeartBeat(ctx context.Context, req *proto.BeatRequest) (*proto.BeatResponse, error) {
 	log.Printf("Recibido HeartBeat de %s: %s", req.FromId, req.Message)
 
@@ -254,8 +251,8 @@ func GetIds() {
 			}
 			handlers.Nodes[peerNodeId] = direccion
 			if resp.IsPrimary {
-				primaryNodeID = peerNodeId
-				log.Printf("Nodo %d es el coordinador", primaryNodeID)
+				handlers.PrimaryNodeID = peerNodeId
+				log.Printf("Nodo %d es el coordinador", handlers.PrimaryNodeID)
 			} else {
 				log.Printf("Nodo %d no es el coordinador", peerNodeId)
 			}

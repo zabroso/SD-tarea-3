@@ -27,8 +27,7 @@ func ListenHeartBeat(conn *grpc.ClientConn, destino string, bully *models.Bully,
 				log.Printf("Error al convertir ID de nodo a entero: %v", err)
 			}
 			bully.Nodes = nodes
-			newNodes := coordinacion.StartElection(bully)
-			handlers.SetNodes(newNodes)
+			coordinacion.StartElection(bully)
 			return false
 
 		} else {
