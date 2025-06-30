@@ -7,17 +7,18 @@ package proto;
 service NodoService {
   rpc SendBall(BallRequest) returns (BallResponse);
   rpc HeartBeat(BeatRequest) returns (BeatResponse);
-  rpc Election (ElectionRequest) returns (ElectionResponse);
-  rpc Coordinator (CoordinatorMessage) returns (Empty);
-  rpc Replicar (Logs) returns (Empty);
+  rpc Election(ElectionRequest) returns (ElectionResponse);
+  rpc Coordinator(CoordinatorMessage) returns (Empty);
+  rpc Replicar(Logs) returns (Empty);
 }
 
 message BallRequest {
   string from_id = 1;
+  Logs logs = 2;
 }
 
 message BallResponse {
-  string message = 1;
+  bool emulado = 1;
 }
 
 message BeatRequest {

@@ -79,7 +79,7 @@ func main() {
 
 func funcionalidadPrimario() {
 	<-continuarCiclo
-	fmt.Println("Nodo coordinador. Iniciando ronda de envío aleatorio de pelotas...")
+	log.Println("Nodo coordinador. Iniciando ronda de envío aleatorio de pelotas...")
 
 	var candidatos []int
 	for nodo, direccion := range handlers.Nodes {
@@ -95,7 +95,7 @@ func funcionalidadPrimario() {
 		return
 	}
 	destino := handlers.Nodes[destinoNodo]
-	fmt.Printf("Enviando pelota a %d (%s)...\n", destinoNodo, destino)
+	log.Printf("Enviando pelota a %d (%s)...\n", destinoNodo, destino)
 
 	ok := enviarPelota(destino, handlers.Estado.ID)
 	if !ok {
@@ -155,41 +155,35 @@ type server struct {
 }
 
 func (s *server) SendBall(ctx context.Context, req *proto.BallRequest) (*proto.BallResponse, error) {
-	log.Printf("Recibida pelota de %s", req.FromId)
+	log.Printf("Recibida pelota de %s", req.GetFromId())
 
-	go func() {
-		if !handlers.Estado.IsPrimary {
-			ejecutarSimulacion()
-		}
+	logs := req.GetLogs()
 
-		if !handlers.Estado.IsPrimary {
-			peerNodeId, err := strconv.Atoi(req.FromId)
-			if err != nil {
-				log.Printf("Error al convertir FromId a entero: %v", err)
-				return
+	if !handlers.Estado.IsPrimary {
+		for _, event := range logs.GetEventLog() {
+			log.Printf("%s\n", event.GetValue())
+			select {
+			case <-ctx.Done():
+				log.Printf("Contexto cancelado, abortando simulación")
+				return nil, ctx.Err()
+			case <-time.After(2 * time.Second):
 			}
-			destino := handlers.Nodes[peerNodeId]
-			enviarPelota(destino, handlers.Estado.ID)
-		} else {
-			continuarCiclo <- struct{}{}
 		}
-	}()
 
-	return &proto.BallResponse{Message: "Pelota Recibida"}, nil
-}
+		peerNodeId, err := strconv.Atoi(req.GetFromId())
+		if err != nil {
+			log.Printf("Error al convertir FromId a entero: %v", err)
+			return nil, err
+		}
 
-func ejecutarSimulacion() {
-	eventos := []string{
-		"Jugando con la pelota",
-		"Se le cayó la pelota",
-		"Buscando la pelota",
-		"Devuelve la pelota al coordinador",
+		destino := handlers.Nodes[peerNodeId]
+		enviarPelota(destino, handlers.Estado.ID)
+
+	} else {
+		continuarCiclo <- struct{}{}
 	}
 
-	for _, e := range eventos {
-		time.Sleep(1 * time.Second)
-		agregarEvento(e)
-	}
+	return &proto.BallResponse{Emulado: true}, nil
 }
 
 // Informa a los nodos del nuevo coordinador
@@ -269,15 +263,40 @@ func enviarPelota(destino string, desde string) bool {
 	defer conn.Close()
 
 	client := proto.NewNodoServiceClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 7*time.Second)
 	defer cancel()
 
-	_, err = client.SendBall(ctx, &proto.BallRequest{FromId: desde})
+	// Convertir sequenceNumber (que es string) a int
+	eventBaseID := handlers.Estado.SequenceNumber
+	// Crear eventos
+	eventos := []*proto.Event{
+		{Id: int32(eventBaseID), Value: "Jugando con la pelota"},
+		{Id: int32(eventBaseID + 1), Value: "Se le cayó la pelota"},
+		{Id: int32(eventBaseID + 2), Value: "Buscando la pelota"},
+	}
+	nuevoSequence := eventBaseID + 3
+
+	logs := &proto.Logs{
+		SequenceNumber: int32(nuevoSequence),
+		EventLog:       eventos,
+	}
+
+	// Actualizar el estado local con nuevo sequenceNumber
+	handlers.Estado.SequenceNumber = nuevoSequence
+
+	// Enviar la pelota
+	resp, err := client.SendBall(ctx, &proto.BallRequest{
+		FromId: desde,
+		Logs:   logs,
+	})
+
 	if err != nil {
-		log.Printf("Error al enviar pelota a %s: %v", destino, err)
+		log.Printf("Error: servidor no respondió o se cayó: %v", err)
 		return false
 	}
 
+	log.Println("Respuesta recibida:", resp.GetEmulado())
 	log.Printf("Pelota enviada a %s", destino)
 	return true
 }
