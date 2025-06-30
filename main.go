@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"SD-Tarea-3/coordinacion"
+	"SD-Tarea-3/handlers"
 	"SD-Tarea-3/models"
 	"SD-Tarea-3/monitoreo"
 	"SD-Tarea-3/proto"
@@ -20,9 +21,10 @@ import (
 	"google.golang.org/grpc"
 )
 
-var estado *models.Nodo
+// var estado *models.Nodo
 var bully *models.Bully
-var nodes map[int]string // Mapa de nodos: ID → dirección IP:puerto
+
+// var nodes map[int]string // Mapa de nodos: ID → dirección IP:puerto
 var nodoID int
 var primaryNodeID int = -1
 var ipMap map[string]string
@@ -37,9 +39,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("ID_NODO inválido: %v", err)
 	}
-	nodes = make(map[int]string)
+	handlers.Nodes = make(map[int]string)
 
-	nodes[nodoID] = os.Getenv("IP_NODO") + ":" + os.Getenv("PORT_NODO")
+	handlers.Nodes[nodoID] = os.Getenv("IP_NODO") + ":" + os.Getenv("PORT_NODO")
 	bully = &models.Bully{}
 	ipMap = map[string]string{
 		"nodo0": os.Getenv("IP_VM1") + ":" + os.Getenv("PORT_VM1"),
@@ -48,16 +50,16 @@ func main() {
 	}
 
 	rutaJson := fmt.Sprintf("nodo_%s.json", os.Getenv("ID_NODO"))
-	estado = cargarEstado(rutaJson)
+	handlers.Estado = cargarEstado(rutaJson)
 	isPrimaryStr := os.Getenv("IS_PRIMARY")
-	estado.IsPrimary = isPrimaryStr == "true"
-	estado.ID = os.Getenv("ID_NODO")
-	estado.Port, err = strconv.Atoi(os.Getenv("PORT_NODO"))
+	handlers.Estado.IsPrimary = isPrimaryStr == "true"
+	handlers.Estado.ID = os.Getenv("ID_NODO")
+	handlers.Estado.Port, err = strconv.Atoi(os.Getenv("PORT_NODO"))
 	if err != nil {
 		log.Fatalf("PORT_NODO inválido: %v\n", err)
 	}
 
-	fmt.Printf("Estado cargado: %+v\n", estado)
+	fmt.Printf("Estado cargado: %+v\n", handlers.Estado)
 
 	go iniciarServidorGRPC()
 
@@ -67,7 +69,7 @@ func main() {
 
 	time.Sleep(2 * time.Second)
 
-	if estado.IsPrimary {
+	if handlers.Estado.IsPrimary {
 		go func() {
 			for {
 				fmt.Println("Nodo coordinador esperando para enviar pelota...")
@@ -75,27 +77,24 @@ func main() {
 				fmt.Println("Nodo coordinador. Iniciando ronda de envío aleatorio de pelotas...")
 
 				// Crear lista de nodos destino
-				var candidatos []string
-				for nodo, direccion := range ipMap {
-					if err != nil {
-						continue
-					}
-					if direccion != nodes[nodoID] {
+				var candidatos []int
+				for nodo, direccion := range handlers.Nodes {
+					if direccion != handlers.Nodes[nodoID] {
 						candidatos = append(candidatos, nodo)
 					}
 				}
 
-				var destinoNodo string
+				var destinoNodo int
 				if rand.Float64() < 0.5 {
 					destinoNodo = candidatos[0]
 				} else {
 					destinoNodo = candidatos[1]
 				}
 
-				destino := ipMap[destinoNodo]
-				fmt.Printf("Enviando pelota a %s (%s)...\n", destinoNodo, destino)
+				destino := handlers.Nodes[destinoNodo]
+				fmt.Printf("Enviando pelota a %d (%s)...\n", destinoNodo, destino)
 
-				ok := enviarPelota(destino, estado.ID)
+				ok := enviarPelota(destino, handlers.Estado.ID)
 				if !ok {
 					log.Println("Fallo al enviar la pelota. Esperando para intentar de nuevo...")
 					// Opcional: reintentar luego de un tiempo
@@ -109,8 +108,9 @@ func main() {
 	} else {
 		go func() {
 			for {
+				log.Println("Esperando señal para verificar HeartBeat...")
 				<-continuarCiclo
-				destino := nodes[primaryNodeID]
+				destino := handlers.Nodes[primaryNodeID]
 				log.Printf("Destino: %v", destino)
 				conn, err := grpc.Dial(destino, grpc.WithInsecure())
 				if err != nil {
@@ -118,20 +118,25 @@ func main() {
 					// Activar algoritmo del maton
 
 					bully.ID = nodoID
-					bully.Nodes = nodes
+					bully.Nodes = handlers.Nodes
 					bully.LeaderID = primaryNodeID
 
-					coordinacion.StartElection(bully)
+					newNodes := coordinacion.StartElection(bully)
+					handlers.SetNodes(newNodes)
 					continue
 				}
 
-				monitoreo.SetEstado(estado)
-				ok := monitoreo.ListenHeartBeat(conn, destino, bully, nodes)
+				ok := monitoreo.ListenHeartBeat(conn, destino, bully, handlers.Nodes)
 				conn.Close()
 
 				if !ok {
-					log.Println("Fallo al enviar la pelota. Esperando para intentar de nuevo...")
+					log.Println("Fallo al escuchar latido. Esperando para intentar de nuevo...")
 					// Opcional: reintentar luego de un tiempo
+					time.AfterFunc(5*time.Second, func() {
+						continuarCiclo <- struct{}{}
+					})
+				} else {
+
 					time.AfterFunc(5*time.Second, func() {
 						continuarCiclo <- struct{}{}
 					})
@@ -156,7 +161,7 @@ func iniciarServidorGRPC() {
 
 	s := grpc.NewServer()
 	proto.RegisterNodoServiceServer(s, &server{})
-	log.Printf("Nodo %s escuchando en %s:%s", estado.ID, ip, port)
+	log.Printf("Nodo %s escuchando en %s:%s", handlers.Estado.ID, ip, port)
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("Fallo al servir: %v", err)
 	}
@@ -170,13 +175,18 @@ func (s *server) SendBall(ctx context.Context, req *proto.BallRequest) (*proto.B
 	log.Printf("Recibida pelota de %s", req.FromId)
 
 	go func() {
-		if !estado.IsPrimary {
+		if !handlers.Estado.IsPrimary {
 			ejecutarSimulacion()
 		}
 
-		if !estado.IsPrimary {
-			destino := ipMap["nodo2"]
-			enviarPelota(destino, estado.ID)
+		if !handlers.Estado.IsPrimary {
+			peerNodeId, err := strconv.Atoi(req.FromId)
+			if err != nil {
+				log.Printf("Error al convertir FromId a entero: %v", err)
+				return
+			}
+			destino := handlers.Nodes[peerNodeId]
+			enviarPelota(destino, handlers.Estado.ID)
 		} else {
 			continuarCiclo <- struct{}{}
 		}
@@ -208,15 +218,15 @@ func (s *server) Election(ctx context.Context, req *proto.ElectionRequest) (*pro
 func (s *server) HeartBeat(ctx context.Context, req *proto.BeatRequest) (*proto.BeatResponse, error) {
 	log.Printf("Recibido HeartBeat de %s: %s", req.FromId, req.Message)
 
-	estado.LastMessage = time.Now().Format(time.RFC3339)
+	handlers.Estado.LastMessage = time.Now().Format(time.RFC3339)
 
-	return &proto.BeatResponse{FromId: estado.ID, Message: "Ok", IsPrimary: estado.IsPrimary}, nil
+	return &proto.BeatResponse{FromId: handlers.Estado.ID, Message: "Ok", IsPrimary: handlers.Estado.IsPrimary}, nil
 }
 
 // Obtiene las direcciones de los nodos con sus respectivos ids y actualiza la variable `nodes`
 func GetIds() {
 	for nodo, direccion := range ipMap {
-		if direccion != nodes[nodoID] {
+		if direccion != handlers.Nodes[nodoID] {
 			log.Printf("Direccion en GetIds de %d: %s", nodoID, direccion)
 			conn, err := grpc.Dial(direccion, grpc.WithInsecure())
 			if err != nil {
@@ -230,9 +240,9 @@ func GetIds() {
 			client := proto.NewNodoServiceClient(conn)
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 			defer cancel()
-			log.Printf("Enviando HeartBeat a %s desde %s", nodo, estado.ID)
+			log.Printf("Enviando HeartBeat a %s desde %s", nodo, handlers.Estado.ID)
 
-			resp, err := client.HeartBeat(ctx, &proto.BeatRequest{FromId: estado.ID, Message: "Acknowledged"})
+			resp, err := client.HeartBeat(ctx, &proto.BeatRequest{FromId: handlers.Estado.ID, Message: "Acknowledged"})
 			if err != nil {
 				log.Printf("Error al enviar HeartBeat a %s: %v", nodo, err)
 				continue
@@ -242,7 +252,7 @@ func GetIds() {
 				log.Printf("Error al convertir FromId a entero: %v", err)
 				continue
 			}
-			nodes[peerNodeId] = direccion
+			handlers.Nodes[peerNodeId] = direccion
 			if resp.IsPrimary {
 				primaryNodeID = peerNodeId
 				log.Printf("Nodo %d es el coordinador", primaryNodeID)
@@ -277,12 +287,12 @@ func enviarPelota(destino string, desde string) bool {
 }
 
 func agregarEvento(mensaje string) {
-	estado.Mu.Lock()
-	defer estado.Mu.Unlock()
-	estado.SequenceNumber++
-	estado.LastMessage = mensaje
-	estado.EventLog = append(estado.EventLog, fmt.Sprintf("[#%d] %s", estado.SequenceNumber, mensaje))
-	saveEstado(fmt.Sprintf("/app/nodo_%s.json", estado.ID))
+	handlers.Estado.Mu.Lock()
+	defer handlers.Estado.Mu.Unlock()
+	handlers.Estado.SequenceNumber++
+	handlers.Estado.LastMessage = mensaje
+	handlers.Estado.EventLog = append(handlers.Estado.EventLog, fmt.Sprintf("[#%d] %s", handlers.Estado.SequenceNumber, mensaje))
+	saveEstado(fmt.Sprintf("/app/nodo_%s.json", handlers.Estado.ID))
 	fmt.Println(mensaje)
 }
 
@@ -299,7 +309,7 @@ func cargarEstado(path string) *models.Nodo {
 }
 
 func saveEstado(path string) {
-	data, err := json.MarshalIndent(estado, "", "  ")
+	data, err := json.MarshalIndent(handlers.Estado, "", "  ")
 	if err != nil {
 		panic(err)
 	}
