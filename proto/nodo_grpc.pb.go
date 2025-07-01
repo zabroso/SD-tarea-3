@@ -19,11 +19,13 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	NodoService_SendBall_FullMethodName    = "/proto.NodoService/SendBall"
-	NodoService_HeartBeat_FullMethodName   = "/proto.NodoService/HeartBeat"
-	NodoService_Election_FullMethodName    = "/proto.NodoService/Election"
-	NodoService_Coordinator_FullMethodName = "/proto.NodoService/Coordinator"
-	NodoService_Replicar_FullMethodName    = "/proto.NodoService/Replicar"
+	NodoService_SendBall_FullMethodName          = "/proto.NodoService/SendBall"
+	NodoService_HeartBeat_FullMethodName         = "/proto.NodoService/HeartBeat"
+	NodoService_Election_FullMethodName          = "/proto.NodoService/Election"
+	NodoService_Coordinator_FullMethodName       = "/proto.NodoService/Coordinator"
+	NodoService_Replicar_FullMethodName          = "/proto.NodoService/Replicar"
+	NodoService_Recuperar_FullMethodName         = "/proto.NodoService/Recuperar"
+	NodoService_RecuperarSequence_FullMethodName = "/proto.NodoService/RecuperarSequence"
 )
 
 // NodoServiceClient is the client API for NodoService service.
@@ -35,6 +37,8 @@ type NodoServiceClient interface {
 	Election(ctx context.Context, in *ElectionRequest, opts ...grpc.CallOption) (*ElectionResponse, error)
 	Coordinator(ctx context.Context, in *CoordinatorMessage, opts ...grpc.CallOption) (*Empty, error)
 	Replicar(ctx context.Context, in *Logs, opts ...grpc.CallOption) (*ReplicarResponse, error)
+	Recuperar(ctx context.Context, in *Logs, opts ...grpc.CallOption) (*ReplicarResponse, error)
+	RecuperarSequence(ctx context.Context, in *Sequence, opts ...grpc.CallOption) (*Desfasado, error)
 }
 
 type nodoServiceClient struct {
@@ -95,6 +99,26 @@ func (c *nodoServiceClient) Replicar(ctx context.Context, in *Logs, opts ...grpc
 	return out, nil
 }
 
+func (c *nodoServiceClient) Recuperar(ctx context.Context, in *Logs, opts ...grpc.CallOption) (*ReplicarResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ReplicarResponse)
+	err := c.cc.Invoke(ctx, NodoService_Recuperar_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *nodoServiceClient) RecuperarSequence(ctx context.Context, in *Sequence, opts ...grpc.CallOption) (*Desfasado, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Desfasado)
+	err := c.cc.Invoke(ctx, NodoService_RecuperarSequence_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // NodoServiceServer is the server API for NodoService service.
 // All implementations must embed UnimplementedNodoServiceServer
 // for forward compatibility.
@@ -104,6 +128,8 @@ type NodoServiceServer interface {
 	Election(context.Context, *ElectionRequest) (*ElectionResponse, error)
 	Coordinator(context.Context, *CoordinatorMessage) (*Empty, error)
 	Replicar(context.Context, *Logs) (*ReplicarResponse, error)
+	Recuperar(context.Context, *Logs) (*ReplicarResponse, error)
+	RecuperarSequence(context.Context, *Sequence) (*Desfasado, error)
 	mustEmbedUnimplementedNodoServiceServer()
 }
 
@@ -128,6 +154,12 @@ func (UnimplementedNodoServiceServer) Coordinator(context.Context, *CoordinatorM
 }
 func (UnimplementedNodoServiceServer) Replicar(context.Context, *Logs) (*ReplicarResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Replicar not implemented")
+}
+func (UnimplementedNodoServiceServer) Recuperar(context.Context, *Logs) (*ReplicarResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Recuperar not implemented")
+}
+func (UnimplementedNodoServiceServer) RecuperarSequence(context.Context, *Sequence) (*Desfasado, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RecuperarSequence not implemented")
 }
 func (UnimplementedNodoServiceServer) mustEmbedUnimplementedNodoServiceServer() {}
 func (UnimplementedNodoServiceServer) testEmbeddedByValue()                     {}
@@ -240,6 +272,42 @@ func _NodoService_Replicar_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
+func _NodoService_Recuperar_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Logs)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NodoServiceServer).Recuperar(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: NodoService_Recuperar_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NodoServiceServer).Recuperar(ctx, req.(*Logs))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _NodoService_RecuperarSequence_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Sequence)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NodoServiceServer).RecuperarSequence(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: NodoService_RecuperarSequence_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NodoServiceServer).RecuperarSequence(ctx, req.(*Sequence))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // NodoService_ServiceDesc is the grpc.ServiceDesc for NodoService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -266,6 +334,14 @@ var NodoService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Replicar",
 			Handler:    _NodoService_Replicar_Handler,
+		},
+		{
+			MethodName: "Recuperar",
+			Handler:    _NodoService_Recuperar_Handler,
+		},
+		{
+			MethodName: "RecuperarSequence",
+			Handler:    _NodoService_RecuperarSequence_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -15,6 +15,7 @@ import (
 	"SD-Tarea-3/handlers"
 	"SD-Tarea-3/models"
 	"SD-Tarea-3/monitoreo"
+	persistencia "SD-Tarea-3/persistencia"
 	"SD-Tarea-3/proto"
 	replicacion "SD-Tarea-3/sync"
 
@@ -103,7 +104,7 @@ func funcionalidadPrimario() {
 	destino := handlers.Nodes[destinoNodo]
 	log.Printf("Enviando pelota a %d (%s)...\n", destinoNodo, destino)
 
-	ok := enviarPelota(destino, handlers.Estado.ID)
+	ok := enviarPelota(destino, handlers.Estado.ID, destinoNodo)
 
 	if ok {
 		replicacion.RegistrarYReplicarEventos(destinoNodo)
@@ -119,23 +120,27 @@ func funcionalidadPrimario() {
 func funcionalidadSecundario() {
 	<-continuarCiclo
 	log.Println("Esperando señal para verificar HeartBeat...")
+
 	destino := handlers.Nodes[handlers.PrimaryNodeID]
 	conn, err := grpc.Dial(destino, grpc.WithInsecure())
 	if err != nil {
+		log.Println("No se pudo conectar con el coordinador. Iniciando elección...")
+
 		bully.ID = nodoID
 		bully.Nodes = handlers.Nodes
 		bully.LeaderID = handlers.PrimaryNodeID
 
 		coordinacion.StartElection(bully)
-
 		return
 	}
-
 	ok := monitoreo.ListenHeartBeat(conn, destino, bully, handlers.Nodes)
 	conn.Close()
 
 	if !ok {
 		log.Println("Error al recibir HeartBeat.")
+	} else {
+		log.Println("HeartBeat recibido correctamente. Verificando sincronización...")
+		persistencia.SincronizarConCoordinador()
 	}
 
 	time.AfterFunc(5*time.Second, func() {
@@ -194,6 +199,29 @@ func (s *server) Replicar(ctx context.Context, req *proto.Logs) (*proto.Replicar
 	return &proto.ReplicarResponse{SequenceNumber: int32(handlers.Estado.SequenceNumber)}, nil
 }
 
+func (s *server) Recuperar(ctx context.Context, req *proto.Logs) (*proto.ReplicarResponse, error) {
+	handlers.Estado.Mu.Lock()
+	defer handlers.Estado.Mu.Unlock()
+
+	var nuevosLogs []models.Event
+	for _, e := range req.GetEventLog() {
+		nuevosLogs = append(nuevosLogs, models.Event{
+			Id:    int(e.Id),
+			Value: e.Value,
+			Nodo:  e.Nodo,
+		})
+	}
+
+	handlers.Estado.EventLog = nuevosLogs
+	handlers.Estado.SequenceNumber = int(req.GetSequenceNumber())
+
+	saveEstado()
+
+	log.Printf("Logs recuperados y reemplazados correctamente. SequenceNumber actualizado a: %d", handlers.Estado.SequenceNumber)
+
+	return &proto.ReplicarResponse{SequenceNumber: int32(handlers.Estado.SequenceNumber)}, nil
+}
+
 // Informa a los nodos del nuevo coordinador
 func (s *server) Coordinator(ctx context.Context, req *proto.CoordinatorMessage) (*proto.Empty, error) {
 	log.Printf("Recibida petición de coordinador de nodo %d", req.CoordinatorId)
@@ -210,6 +238,13 @@ func (s *server) Election(ctx context.Context, req *proto.ElectionRequest) (*pro
 	log.Printf("Recibida petición de elección de nodo %d", req.SenderId)
 
 	return &proto.ElectionResponse{Ok: true}, nil
+}
+
+func (s *server) RecuperarSequence(ctx context.Context, req *proto.Sequence) (*proto.Desfasado, error) {
+
+	desfasado := req.SequenceNumber == int32(handlers.Estado.SequenceNumber)
+
+	return &proto.Desfasado{Desfasado: desfasado}, nil
 }
 
 // Se encarga de verificar que el nodo sigue activo. También es utilizado para obtener los ids de los nodos al inicio
@@ -285,7 +320,7 @@ func GetIds() {
 	}
 }
 
-func enviarPelota(destino string, desde string) bool {
+func enviarPelota(destino string, desde string, idNodo int) bool {
 	conn, err := grpc.Dial(destino, grpc.WithInsecure())
 	if err != nil {
 		log.Printf("Error al conectar con %s: %v", destino, err)
@@ -322,6 +357,7 @@ func enviarPelota(destino string, desde string) bool {
 
 	if err != nil {
 		log.Printf("Error: servidor no respondió o se cayó: %v", err)
+		delete(handlers.Nodes, idNodo)
 		return false
 	}
 

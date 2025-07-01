@@ -10,6 +10,8 @@ service NodoService {
   rpc Election(ElectionRequest) returns (ElectionResponse);
   rpc Coordinator(CoordinatorMessage) returns (Empty);
   rpc Replicar(Logs) returns (ReplicarResponse);
+  rpc Recuperar(Logs) returns (ReplicarResponse);
+  rpc RecuperarSequence(Sequence) returns (Desfasado);
 }
 
 message BallRequest {
@@ -60,4 +62,12 @@ message Logs {
 
 message ReplicarResponse {
   int32 sequence_number = 1;
+}
+
+message Sequence {
+  int32 sequence_number = 1;
+}
+
+message Desfasado {
+  bool desfasado = 1;
 }
