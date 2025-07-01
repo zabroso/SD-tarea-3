@@ -107,7 +107,7 @@ func funcionalidadPrimario() {
 	destino := handlers.Nodes[destinoNodo]
 	log.Printf("Enviando pelota a %d (%s)...\n", destinoNodo, destino)
 
-	ok := enviarPelota(destino, handlers.Estado.ID)
+	ok := enviarPelota(destino, handlers.Estado.ID, destinoNodo)
 
 	if ok {
 		replicacion.RegistrarYReplicarEventos(destinoNodo)
@@ -163,6 +163,7 @@ type server struct {
 	proto.UnimplementedNodoServiceServer
 }
 
+// Maneja la recepción de la pelota
 func (s *server) SendBall(ctx context.Context, req *proto.BallRequest) (*proto.BallResponse, error) {
 	log.Printf("Recibida pelota de %s", req.GetFromId())
 
@@ -183,6 +184,8 @@ func (s *server) SendBall(ctx context.Context, req *proto.BallRequest) (*proto.B
 	return &proto.BallResponse{Emulado: true}, nil
 }
 
+// Maneja la replicación de estados de los nodos
+// Guarda los eventos recibidos en el estado del nodo y actualiza el sequence number
 func (s *server) Replicar(ctx context.Context, req *proto.Logs) (*proto.ReplicarResponse, error) {
 	for _, e := range req.GetEventLog() {
 		agregarEvento(e.Value, e.Nodo)
@@ -278,7 +281,9 @@ func GetIds() {
 	}
 }
 
-func enviarPelota(destino string, desde string) bool {
+// Envia la pelota a un nodo destino y maneja la replicación de eventos
+// Retorna true si la pelota fue enviada correctamente, false en caso contrario
+func enviarPelota(destino string, desde string, destinoNodo int) bool {
 	conn, err := grpc.Dial(destino, grpc.WithInsecure())
 	if err != nil {
 		log.Printf("Error al conectar con %s: %v", destino, err)
@@ -304,10 +309,6 @@ func enviarPelota(destino string, desde string) bool {
 		EventLog:       eventos,
 	}
 
-	// Actualizar el estado local con nuevo sequenceNumber
-	// handlers.Estado.SequenceNumber = nuevoSequence
-
-	// Enviar la pelota
 	resp, err := client.SendBall(ctx, &proto.BallRequest{
 		FromId: desde,
 		Logs:   logs,
@@ -315,6 +316,7 @@ func enviarPelota(destino string, desde string) bool {
 
 	if err != nil {
 		log.Printf("Error: servidor no respondió o se cayó: %v", err)
+		delete(handlers.Nodes, destinoNodo)
 		return false
 	}
 
@@ -323,6 +325,8 @@ func enviarPelota(destino string, desde string) bool {
 	return true
 }
 
+// Agrega un evento al registro de eventos del nodo y actualiza el sequence number
+// También guarda el estado actualizado en el archivo nodo.json
 func agregarEvento(mensaje string, nodo string) {
 	handlers.Estado.Mu.Lock()
 	defer handlers.Estado.Mu.Unlock()
@@ -338,6 +342,8 @@ func agregarEvento(mensaje string, nodo string) {
 	saveEstado()
 }
 
+// Carga el estado del nodo desde un archivo JSON
+// Si el archivo no existe o hay un error, se genera un panic
 func cargarEstado(path string) *models.Nodo {
 	file, err := os.ReadFile(path)
 	if err != nil {
@@ -350,6 +356,8 @@ func cargarEstado(path string) *models.Nodo {
 	return &n
 }
 
+// Guarda el estado del nodo en un archivo JSON
+// Si hay un error al serializar o escribir el archivo, se genera un panic
 func saveEstado() {
 	path := "/app/nodo.json"
 
