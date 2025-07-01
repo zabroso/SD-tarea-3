@@ -35,3 +35,5 @@ Para poder montar el sistema se debe ejecutar el siguiente comando:
     * Comando para iniciar un nodo nuevamente:
   
             bash commands.bash kill [id_nodo]
+
+* Idealmente dar un lapso de tiempo para que trabajen los nodos antes de dar muerte o iniciar un nodo. Por ejemplo, no iniciar y matar un nodo al mismo tiempo.
