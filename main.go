@@ -16,6 +16,7 @@ import (
 	"SD-Tarea-3/models"
 	"SD-Tarea-3/monitoreo"
 	"SD-Tarea-3/proto"
+	replicacion "SD-Tarea-3/sync"
 
 	"github.com/joho/godotenv"
 	"google.golang.org/grpc"
@@ -74,6 +75,7 @@ func main() {
 			}
 		}
 	}()
+
 	continuarCiclo <- struct{}{}
 	select {}
 }
@@ -88,26 +90,30 @@ func funcionalidadPrimario() {
 			candidatos = append(candidatos, nodo)
 		}
 	}
-	var destinoNodo int
-	if len(candidatos) > 0 {
-		destinoNodo = candidatos[rand.Intn(len(candidatos))]
-	} else {
+
+	if len(candidatos) == 0 {
 		log.Println("No hay nodos disponibles para enviar la pelota.")
 		time.AfterFunc(5*time.Second, func() {
 			continuarCiclo <- struct{}{}
 		})
 		return
 	}
+
+	destinoNodo := candidatos[rand.Intn(len(candidatos))]
 	destino := handlers.Nodes[destinoNodo]
 	log.Printf("Enviando pelota a %d (%s)...\n", destinoNodo, destino)
 
 	ok := enviarPelota(destino, handlers.Estado.ID)
-	if !ok {
+
+	if ok {
+		replicacion.RegistrarYReplicarEventos(destinoNodo)
+	} else {
 		log.Println("Fallo al enviar la pelota. Esperando para intentar de nuevo...")
-		time.AfterFunc(5*time.Second, func() {
-			continuarCiclo <- struct{}{}
-		})
 	}
+
+	time.AfterFunc(5*time.Second, func() {
+		continuarCiclo <- struct{}{}
+	})
 }
 
 func funcionalidadSecundario() {
@@ -173,21 +179,19 @@ func (s *server) SendBall(ctx context.Context, req *proto.BallRequest) (*proto.B
 			case <-time.After(2 * time.Second):
 			}
 		}
-
-		peerNodeId, err := strconv.Atoi(req.GetFromId())
-		if err != nil {
-			log.Printf("Error al convertir FromId a entero: %v", err)
-			return nil, err
-		}
-
-		destino := handlers.Nodes[peerNodeId]
-		enviarPelota(destino, handlers.Estado.ID)
-
-	} else {
-		continuarCiclo <- struct{}{}
 	}
 
 	return &proto.BallResponse{Emulado: true}, nil
+}
+
+func (s *server) Replicar(ctx context.Context, req *proto.Logs) (*proto.Empty, error) {
+	for _, e := range req.GetEventLog() {
+		agregarEvento(e.Value, e.Nodo)
+	}
+
+	log.Printf("Logs replicados y guardados correctamente. SequenceNumber: %d", handlers.Estado.SequenceNumber)
+
+	return &proto.Empty{}, nil
 }
 
 // Informa a los nodos del nuevo coordinador
@@ -294,9 +298,7 @@ func enviarPelota(destino string, desde string) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 7*time.Second)
 	defer cancel()
 
-	// Convertir sequenceNumber (que es string) a int
 	eventBaseID := handlers.Estado.SequenceNumber
-	// Crear eventos
 	eventos := []*proto.Event{
 		{Id: int32(eventBaseID), Value: "Jugando con la pelota"},
 		{Id: int32(eventBaseID + 1), Value: "Se le cayó la pelota"},
@@ -310,7 +312,7 @@ func enviarPelota(destino string, desde string) bool {
 	}
 
 	// Actualizar el estado local con nuevo sequenceNumber
-	handlers.Estado.SequenceNumber = nuevoSequence
+	// handlers.Estado.SequenceNumber = nuevoSequence
 
 	// Enviar la pelota
 	resp, err := client.SendBall(ctx, &proto.BallRequest{
@@ -328,14 +330,19 @@ func enviarPelota(destino string, desde string) bool {
 	return true
 }
 
-func agregarEvento(mensaje string) {
+func agregarEvento(mensaje string, nodo string) {
 	handlers.Estado.Mu.Lock()
 	defer handlers.Estado.Mu.Unlock()
+
 	handlers.Estado.SequenceNumber++
+	evento := models.Event{
+		Id:    handlers.Estado.SequenceNumber,
+		Value: mensaje,
+		Nodo:  nodo,
+	}
 	handlers.Estado.LastMessage = mensaje
-	handlers.Estado.EventLog = append(handlers.Estado.EventLog, fmt.Sprintf("[#%d] %s", handlers.Estado.SequenceNumber, mensaje))
+	handlers.Estado.EventLog = append(handlers.Estado.EventLog, evento)
 	saveEstado()
-	log.Printf(mensaje)
 }
 
 func cargarEstado(path string) *models.Nodo {

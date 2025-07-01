@@ -22,3 +22,8 @@ func NewPrimary() {
 	newPrimaryNodeID, _ := strconv.Atoi(Estado.ID)
 	PrimaryNodeID = newPrimaryNodeID
 }
+
+func GetNodeID() int {
+	id, _ := strconv.Atoi(Estado.ID)
+	return id
+}
