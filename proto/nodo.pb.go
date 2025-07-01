@@ -121,6 +121,7 @@ type BeatRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	FromId        string                 `protobuf:"bytes,1,opt,name=from_id,json=fromId,proto3" json:"from_id,omitempty"`
 	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	Ip            string                 `protobuf:"bytes,3,opt,name=ip,proto3" json:"ip,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -165,6 +166,13 @@ func (x *BeatRequest) GetFromId() string {
 func (x *BeatRequest) GetMessage() string {
 	if x != nil {
 		return x.Message
+	}
+	return ""
+}
+
+func (x *BeatRequest) GetIp() string {
+	if x != nil {
+		return x.Ip
 	}
 	return ""
 }
@@ -562,10 +570,11 @@ const file_proto_nodo_proto_rawDesc = "" +
 	"\afrom_id\x18\x01 \x01(\tR\x06fromId\x12\x1f\n" +
 	"\x04logs\x18\x02 \x01(\v2\v.proto.LogsR\x04logs\"(\n" +
 	"\fBallResponse\x12\x18\n" +
-	"\aemulado\x18\x01 \x01(\bR\aemulado\"@\n" +
+	"\aemulado\x18\x01 \x01(\bR\aemulado\"P\n" +
 	"\vBeatRequest\x12\x17\n" +
 	"\afrom_id\x18\x01 \x01(\tR\x06fromId\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"`\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12\x0e\n" +
+	"\x02ip\x18\x03 \x01(\tR\x02ip\"`\n" +
 	"\fBeatResponse\x12\x17\n" +
 	"\afrom_id\x18\x01 \x01(\tR\x06fromId\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12\x1d\n" +
