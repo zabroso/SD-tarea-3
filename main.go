@@ -56,7 +56,11 @@ func main() {
 		log.Fatalf("PORT_NODO inválido: %v\n", err)
 	}
 
-	log.Printf("Estado cargado: %+v\n", handlers.Estado)
+	log.Printf("Estado cargado: ID=%s, SequenceNumber=%d, EventLog=%+v\n",
+		handlers.Estado.ID,
+		handlers.Estado.SequenceNumber,
+		handlers.Estado.EventLog,
+	)
 
 	go iniciarServidorGRPC()
 
@@ -118,7 +122,6 @@ func funcionalidadPrimario() {
 
 func funcionalidadSecundario() {
 	<-continuarCiclo
-	log.Println("Esperando señal para verificar HeartBeat...")
 	destino := handlers.Nodes[handlers.PrimaryNodeID]
 	conn, err := grpc.Dial(destino, grpc.WithInsecure())
 	if err != nil {
@@ -131,12 +134,8 @@ func funcionalidadSecundario() {
 		return
 	}
 
-	ok := monitoreo.ListenHeartBeat(conn, destino, bully, handlers.Nodes)
+	monitoreo.ListenHeartBeat(conn, destino, bully, handlers.Nodes)
 	conn.Close()
-
-	if !ok {
-		log.Println("Error al recibir HeartBeat.")
-	}
 
 	time.AfterFunc(5*time.Second, func() {
 		continuarCiclo <- struct{}{}
@@ -200,8 +199,6 @@ func (s *server) Coordinator(ctx context.Context, req *proto.CoordinatorMessage)
 
 	handlers.PrimaryNodeID = int(req.CoordinatorId)
 
-	log.Printf("Nodo %d se ha convertido en coordinador", handlers.PrimaryNodeID)
-
 	return &proto.Empty{}, nil
 }
 
@@ -214,7 +211,6 @@ func (s *server) Election(ctx context.Context, req *proto.ElectionRequest) (*pro
 
 // Se encarga de verificar que el nodo sigue activo. También es utilizado para obtener los ids de los nodos al inicio
 func (s *server) HeartBeat(ctx context.Context, req *proto.BeatRequest) (*proto.BeatResponse, error) {
-	log.Printf("Recibido HeartBeat de %s: %s", req.FromId, req.Message)
 	id, err := strconv.Atoi(req.FromId)
 	if err != nil {
 		log.Printf("Error al convertir FromId a entero: %v", err)
@@ -235,7 +231,6 @@ func (s *server) HeartBeat(ctx context.Context, req *proto.BeatRequest) (*proto.
 func GetIds() {
 	for nodo, direccion := range ipMap {
 		if direccion != handlers.Nodes[nodoID] {
-			log.Printf("Direccion en GetIds de %d: %s", nodoID, direccion)
 			conn, err := grpc.Dial(direccion, grpc.WithInsecure())
 			if err != nil {
 				log.Printf("Error direccion %s", direccion)
@@ -248,7 +243,6 @@ func GetIds() {
 			client := proto.NewNodoServiceClient(conn)
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 			defer cancel()
-			log.Printf("Enviando HeartBeat a %s desde %s", nodo, handlers.Estado.ID)
 
 			resp, err := client.HeartBeat(ctx, &proto.BeatRequest{FromId: handlers.Estado.ID, Message: "Acknowledged", Ip: handlers.Nodes[nodoID]})
 			if err != nil {
@@ -261,7 +255,6 @@ func GetIds() {
 				continue
 			}
 			handlers.Nodes[peerNodeId] = direccion
-			log.Printf("HeartBeat recibido de %s: %v", resp.FromId, resp.IsPrimary)
 			if resp.IsPrimary {
 				log.Printf("Nodo %d es el coordinador actual", peerNodeId)
 				handlers.PrimaryNodeID = peerNodeId

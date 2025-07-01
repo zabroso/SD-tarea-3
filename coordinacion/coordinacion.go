@@ -18,6 +18,7 @@ func StartElection(b *models.Bully) {
 
 	for peerID, address := range b.Nodes {
 		if peerID <= b.ID {
+			delete(handlers.Nodes, peerID)
 			continue
 		}
 
@@ -45,7 +46,7 @@ func StartElection(b *models.Bully) {
 		handlers.NewPrimary()
 		AnnounceCoordinator(b)
 	} else {
-		fmt.Println("Esperando que otro nodo anuncie al nuevo líder...")
+		fmt.Println("Esperando que otro nodo anuncie al nuevo coordinador...")
 		time.Sleep(5 * time.Second)
 	}
 

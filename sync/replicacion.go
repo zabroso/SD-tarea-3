@@ -60,8 +60,6 @@ func RegistrarYReplicarEventos(destinoNodo int) {
 				_, err = client.Replicar(ctx, logs)
 				if err != nil {
 					log.Printf("Error replicando logs a %s: %v", direccion, err)
-				} else {
-					log.Printf("Logs replicados exitosamente a %s", direccion)
 				}
 			}(direccion)
 		}
