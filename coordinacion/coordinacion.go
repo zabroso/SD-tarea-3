@@ -13,7 +13,7 @@ import (
 )
 
 func StartElection(b *models.Bully) {
-	log.Println("Bully algorithm executed")
+	log.Println("Se ejecuta algoritmo del Matón")
 	receivedOK := false
 
 	for peerID, address := range b.Nodes {

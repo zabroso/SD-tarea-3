@@ -64,6 +64,7 @@ func main() {
 	go GetIds()
 
 	time.Sleep(2 * time.Second)
+
 	go func() {
 		for {
 			if handlers.Estado.IsPrimary {
@@ -92,6 +93,9 @@ func funcionalidadPrimario() {
 		destinoNodo = candidatos[rand.Intn(len(candidatos))]
 	} else {
 		log.Println("No hay nodos disponibles para enviar la pelota.")
+		time.AfterFunc(5*time.Second, func() {
+			continuarCiclo <- struct{}{}
+		})
 		return
 	}
 	destino := handlers.Nodes[destinoNodo]
@@ -207,13 +211,23 @@ func (s *server) Election(ctx context.Context, req *proto.ElectionRequest) (*pro
 // Se encarga de verificar que el nodo sigue activo. También es utilizado para obtener los ids de los nodos al inicio
 func (s *server) HeartBeat(ctx context.Context, req *proto.BeatRequest) (*proto.BeatResponse, error) {
 	log.Printf("Recibido HeartBeat de %s: %s", req.FromId, req.Message)
+	id, err := strconv.Atoi(req.FromId)
+	if err != nil {
+		log.Printf("Error al convertir FromId a entero: %v", err)
+		return nil, err
+	}
 
+	if _, exists := handlers.Nodes[id]; !exists {
+		log.Printf("Reintegrando nodo %d con dirección %s", id, req.Ip)
+		handlers.Nodes[id] = req.Ip
+	}
 	handlers.Estado.LastMessage = time.Now().Format(time.RFC3339)
 
 	return &proto.BeatResponse{FromId: handlers.Estado.ID, Message: "Ok", IsPrimary: handlers.Estado.IsPrimary}, nil
 }
 
-// Obtiene las direcciones de los nodos con sus respectivos ids y actualiza la variable `nodes`
+// Obtiene las direcciones de los nodos con sus respectivos ids y actualiza la variable `nodes`.
+// Ayuda a reintegrar nodos cuando se reinician
 func GetIds() {
 	for nodo, direccion := range ipMap {
 		if direccion != handlers.Nodes[nodoID] {
@@ -232,7 +246,7 @@ func GetIds() {
 			defer cancel()
 			log.Printf("Enviando HeartBeat a %s desde %s", nodo, handlers.Estado.ID)
 
-			resp, err := client.HeartBeat(ctx, &proto.BeatRequest{FromId: handlers.Estado.ID, Message: "Acknowledged"})
+			resp, err := client.HeartBeat(ctx, &proto.BeatRequest{FromId: handlers.Estado.ID, Message: "Acknowledged", Ip: handlers.Nodes[nodoID]})
 			if err != nil {
 				log.Printf("Error al enviar HeartBeat a %s: %v", nodo, err)
 				continue
@@ -243,14 +257,27 @@ func GetIds() {
 				continue
 			}
 			handlers.Nodes[peerNodeId] = direccion
+			log.Printf("HeartBeat recibido de %s: %v", resp.FromId, resp.IsPrimary)
 			if resp.IsPrimary {
+				log.Printf("Nodo %d es el coordinador actual", peerNodeId)
 				handlers.PrimaryNodeID = peerNodeId
-				log.Printf("Nodo %d es el coordinador", handlers.PrimaryNodeID)
-			} else {
-				log.Printf("Nodo %d no es el coordinador", peerNodeId)
 			}
 		}
 
+	}
+
+	if handlers.PrimaryNodeID == -1 {
+		var maxID int
+		for id := range handlers.Nodes {
+			if id > maxID {
+				maxID = id
+			}
+		}
+		handlers.PrimaryNodeID = maxID
+
+		if handlers.PrimaryNodeID == nodoID {
+			handlers.Estado.IsPrimary = true
+		}
 	}
 }
 

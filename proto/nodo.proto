@@ -24,6 +24,7 @@ message BallResponse {
 message BeatRequest {
   string from_id = 1;
   string message = 2;
+  string ip = 3;
 }
 
 message BeatResponse {

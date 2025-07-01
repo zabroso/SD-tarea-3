@@ -7,7 +7,7 @@ import (
 
 var Estado *models.Nodo
 var Nodes map[int]string
-var PrimaryNodeID int
+var PrimaryNodeID int = -1
 
 func SetEstado(newEstado *models.Nodo) {
 	Estado = newEstado
