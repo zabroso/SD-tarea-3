@@ -176,7 +176,7 @@ func (s *server) SendBall(ctx context.Context, req *proto.BallRequest) (*proto.B
 			case <-ctx.Done():
 				log.Printf("Contexto cancelado, abortando simulación")
 				return nil, ctx.Err()
-			case <-time.After(2 * time.Second):
+			case <-time.After(4 * time.Second):
 			}
 		}
 	}
@@ -295,7 +295,7 @@ func enviarPelota(destino string, desde string) bool {
 
 	client := proto.NewNodoServiceClient(conn)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 7*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
 	eventBaseID := handlers.Estado.SequenceNumber

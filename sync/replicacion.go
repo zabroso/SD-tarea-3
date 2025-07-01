@@ -42,7 +42,14 @@ func RegistrarYReplicarEventos(destinoNodo int) {
 					SequenceNumber: int32(handlers.Estado.SequenceNumber),
 					EventLog:       []*proto.Event{},
 				}
-				for _, e := range handlers.Estado.EventLog {
+				eventos := handlers.Estado.EventLog
+				start := len(eventos) - 3
+
+				if start < 0 {
+					start = 0
+				}
+
+				for _, e := range eventos[start:] {
 					logs.EventLog = append(logs.EventLog, &proto.Event{
 						Id:    int32(e.Id),
 						Value: e.Value,
@@ -65,16 +72,15 @@ func agregarEvento(mensaje string, nodo string) {
 	handlers.Estado.Mu.Lock()
 	defer handlers.Estado.Mu.Unlock()
 
-	handlers.Estado.SequenceNumber++
 	evento := models.Event{
 		Id:    handlers.Estado.SequenceNumber,
 		Value: mensaje,
 		Nodo:  nodo,
 	}
+	handlers.Estado.SequenceNumber++
 	handlers.Estado.LastMessage = mensaje
 	handlers.Estado.EventLog = append(handlers.Estado.EventLog, evento)
 	saveEstado()
-	log.Printf(mensaje)
 }
 
 func saveEstado() {
