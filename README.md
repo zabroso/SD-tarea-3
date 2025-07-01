@@ -35,3 +35,7 @@ Para poder montar el sistema, deben estar en la rama `main` del repositorio y se
     * Comando para iniciar un nodo nuevamente:
   
             bash commands.bash kill [id_nodo]
+
+* Idealmente dar un lapso de tiempo para que trabajen los nodos antes de dar muerte o iniciar un nodo. Por ejemplo, no iniciar y matar un nodo al mismo tiempo.
+* Hay una espera de al menos 15 segundos por evento (Eso incluye a veces el retomar las funciones del primario para un nodo que recién tomó el puesto, a veces demora)
+* A veces hay fallas o errores, pero no necesariamente se ha muerto el sistema, es solo el reconocimiento de estos.

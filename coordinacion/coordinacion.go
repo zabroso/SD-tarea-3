@@ -18,7 +18,6 @@ func StartElection(b *models.Bully) {
 
 	for peerID, address := range b.Nodes {
 		if peerID <= b.ID {
-			delete(handlers.Nodes, peerID)
 			continue
 		}
 

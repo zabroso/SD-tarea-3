@@ -15,15 +15,15 @@ import (
 	"google.golang.org/grpc"
 )
 
+// Registra eventos en el nodo y los replica a otros nodos
+// Este método se invoca cuando un nodo recibe una pelota y debe registrar los eventos
 func RegistrarYReplicarEventos(destinoNodo int) {
 	nodoStr := strconv.Itoa(destinoNodo)
 
-	// Agregar eventos al estado local
 	agregarEvento("Jugando con la pelota", nodoStr)
 	agregarEvento("Se le cayó la pelota", nodoStr)
 	agregarEvento("Buscando la pelota", nodoStr)
 
-	// Replicar eventos a los demás nodos
 	for _, direccion := range handlers.Nodes {
 		if direccion != handlers.Nodes[handlers.GetNodeID()] {
 			go func(direccion string) {
@@ -68,6 +68,7 @@ func RegistrarYReplicarEventos(destinoNodo int) {
 	}
 }
 
+// Agrega un evento al registro de eventos del nodo y actualiza el sequence number
 func agregarEvento(mensaje string, nodo string) {
 	handlers.Estado.Mu.Lock()
 	defer handlers.Estado.Mu.Unlock()
@@ -83,6 +84,8 @@ func agregarEvento(mensaje string, nodo string) {
 	saveEstado()
 }
 
+// Guarda el estado del nodo en un archivo JSON
+// Si hay un error al serializar o escribir el archivo, se genera un panic
 func saveEstado() {
 	path := "/app/nodo.json"
 
