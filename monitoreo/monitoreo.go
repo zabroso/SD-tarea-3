@@ -29,7 +29,6 @@ func ListenHeartBeat(conn *grpc.ClientConn, destino string, bully *models.Bully,
 			}
 			bully.Nodes = nodes
 			coordinacion.StartElection(bully)
-
 			return
 
 		} else {
