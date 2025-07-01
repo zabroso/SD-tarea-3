@@ -9,7 +9,7 @@ service NodoService {
   rpc HeartBeat(BeatRequest) returns (BeatResponse);
   rpc Election(ElectionRequest) returns (ElectionResponse);
   rpc Coordinator(CoordinatorMessage) returns (Empty);
-  rpc Replicar(Logs) returns (Empty);
+  rpc Replicar(Logs) returns (ReplicarResponse);
 }
 
 message BallRequest {
@@ -55,4 +55,8 @@ message Event {
 message Logs {
   int32 sequence_number = 1;
   repeated Event event_log = 2;
+}
+
+message ReplicarResponse {
+  int32 sequence_number = 1;
 }

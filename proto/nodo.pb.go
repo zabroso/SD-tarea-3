@@ -509,6 +509,50 @@ func (x *Logs) GetEventLog() []*Event {
 	return nil
 }
 
+type ReplicarResponse struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	SequenceNumber int32                  `protobuf:"varint,1,opt,name=sequence_number,json=sequenceNumber,proto3" json:"sequence_number,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ReplicarResponse) Reset() {
+	*x = ReplicarResponse{}
+	mi := &file_proto_nodo_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReplicarResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReplicarResponse) ProtoMessage() {}
+
+func (x *ReplicarResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_nodo_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReplicarResponse.ProtoReflect.Descriptor instead.
+func (*ReplicarResponse) Descriptor() ([]byte, []int) {
+	return file_proto_nodo_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *ReplicarResponse) GetSequenceNumber() int32 {
+	if x != nil {
+		return x.SequenceNumber
+	}
+	return 0
+}
+
 var File_proto_nodo_proto protoreflect.FileDescriptor
 
 const file_proto_nodo_proto_rawDesc = "" +
@@ -540,13 +584,15 @@ const file_proto_nodo_proto_rawDesc = "" +
 	"\x04nodo\x18\x03 \x01(\tR\x04nodo\"Z\n" +
 	"\x04Logs\x12'\n" +
 	"\x0fsequence_number\x18\x01 \x01(\x05R\x0esequenceNumber\x12)\n" +
-	"\tevent_log\x18\x02 \x03(\v2\f.proto.EventR\beventLog2\x94\x02\n" +
+	"\tevent_log\x18\x02 \x03(\v2\f.proto.EventR\beventLog\";\n" +
+	"\x10ReplicarResponse\x12'\n" +
+	"\x0fsequence_number\x18\x01 \x01(\x05R\x0esequenceNumber2\x9f\x02\n" +
 	"\vNodoService\x123\n" +
 	"\bSendBall\x12\x12.proto.BallRequest\x1a\x13.proto.BallResponse\x124\n" +
 	"\tHeartBeat\x12\x12.proto.BeatRequest\x1a\x13.proto.BeatResponse\x12;\n" +
 	"\bElection\x12\x16.proto.ElectionRequest\x1a\x17.proto.ElectionResponse\x126\n" +
-	"\vCoordinator\x12\x19.proto.CoordinatorMessage\x1a\f.proto.Empty\x12%\n" +
-	"\bReplicar\x12\v.proto.Logs\x1a\f.proto.EmptyB\bZ\x06/protob\x06proto3"
+	"\vCoordinator\x12\x19.proto.CoordinatorMessage\x1a\f.proto.Empty\x120\n" +
+	"\bReplicar\x12\v.proto.Logs\x1a\x17.proto.ReplicarResponseB\bZ\x06/protob\x06proto3"
 
 var (
 	file_proto_nodo_proto_rawDescOnce sync.Once
@@ -560,7 +606,7 @@ func file_proto_nodo_proto_rawDescGZIP() []byte {
 	return file_proto_nodo_proto_rawDescData
 }
 
-var file_proto_nodo_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_proto_nodo_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_proto_nodo_proto_goTypes = []any{
 	(*BallRequest)(nil),        // 0: proto.BallRequest
 	(*BallResponse)(nil),       // 1: proto.BallResponse
@@ -572,25 +618,26 @@ var file_proto_nodo_proto_goTypes = []any{
 	(*Empty)(nil),              // 7: proto.Empty
 	(*Event)(nil),              // 8: proto.Event
 	(*Logs)(nil),               // 9: proto.Logs
+	(*ReplicarResponse)(nil),   // 10: proto.ReplicarResponse
 }
 var file_proto_nodo_proto_depIdxs = []int32{
-	9, // 0: proto.BallRequest.logs:type_name -> proto.Logs
-	8, // 1: proto.Logs.event_log:type_name -> proto.Event
-	0, // 2: proto.NodoService.SendBall:input_type -> proto.BallRequest
-	2, // 3: proto.NodoService.HeartBeat:input_type -> proto.BeatRequest
-	4, // 4: proto.NodoService.Election:input_type -> proto.ElectionRequest
-	6, // 5: proto.NodoService.Coordinator:input_type -> proto.CoordinatorMessage
-	9, // 6: proto.NodoService.Replicar:input_type -> proto.Logs
-	1, // 7: proto.NodoService.SendBall:output_type -> proto.BallResponse
-	3, // 8: proto.NodoService.HeartBeat:output_type -> proto.BeatResponse
-	5, // 9: proto.NodoService.Election:output_type -> proto.ElectionResponse
-	7, // 10: proto.NodoService.Coordinator:output_type -> proto.Empty
-	7, // 11: proto.NodoService.Replicar:output_type -> proto.Empty
-	7, // [7:12] is the sub-list for method output_type
-	2, // [2:7] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	9,  // 0: proto.BallRequest.logs:type_name -> proto.Logs
+	8,  // 1: proto.Logs.event_log:type_name -> proto.Event
+	0,  // 2: proto.NodoService.SendBall:input_type -> proto.BallRequest
+	2,  // 3: proto.NodoService.HeartBeat:input_type -> proto.BeatRequest
+	4,  // 4: proto.NodoService.Election:input_type -> proto.ElectionRequest
+	6,  // 5: proto.NodoService.Coordinator:input_type -> proto.CoordinatorMessage
+	9,  // 6: proto.NodoService.Replicar:input_type -> proto.Logs
+	1,  // 7: proto.NodoService.SendBall:output_type -> proto.BallResponse
+	3,  // 8: proto.NodoService.HeartBeat:output_type -> proto.BeatResponse
+	5,  // 9: proto.NodoService.Election:output_type -> proto.ElectionResponse
+	7,  // 10: proto.NodoService.Coordinator:output_type -> proto.Empty
+	10, // 11: proto.NodoService.Replicar:output_type -> proto.ReplicarResponse
+	7,  // [7:12] is the sub-list for method output_type
+	2,  // [2:7] is the sub-list for method input_type
+	2,  // [2:2] is the sub-list for extension type_name
+	2,  // [2:2] is the sub-list for extension extendee
+	0,  // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_proto_nodo_proto_init() }
@@ -604,7 +651,7 @@ func file_proto_nodo_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_nodo_proto_rawDesc), len(file_proto_nodo_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   10,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

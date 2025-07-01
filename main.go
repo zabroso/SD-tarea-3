@@ -180,14 +180,14 @@ func (s *server) SendBall(ctx context.Context, req *proto.BallRequest) (*proto.B
 	return &proto.BallResponse{Emulado: true}, nil
 }
 
-func (s *server) Replicar(ctx context.Context, req *proto.Logs) (*proto.Empty, error) {
+func (s *server) Replicar(ctx context.Context, req *proto.Logs) (*proto.ReplicarResponse, error) {
 	for _, e := range req.GetEventLog() {
 		agregarEvento(e.Value, e.Nodo)
 	}
 
 	log.Printf("Logs replicados y guardados correctamente. SequenceNumber: %d", handlers.Estado.SequenceNumber)
 
-	return &proto.Empty{}, nil
+	return &proto.ReplicarResponse{SequenceNumber: int32(handlers.Estado.SequenceNumber)}, nil
 }
 
 // Informa a los nodos del nuevo coordinador
