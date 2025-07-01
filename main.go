@@ -131,12 +131,8 @@ func funcionalidadSecundario() {
 		return
 	}
 
-	ok := monitoreo.ListenHeartBeat(conn, destino, bully, handlers.Nodes)
+	monitoreo.ListenHeartBeat(conn, destino, bully, handlers.Nodes)
 	conn.Close()
-
-	if !ok {
-		log.Println("Error al recibir HeartBeat.")
-	}
 
 	time.AfterFunc(5*time.Second, func() {
 		continuarCiclo <- struct{}{}
