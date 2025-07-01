@@ -401,6 +401,7 @@ type Event struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            int32                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
 	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	Nodo          string                 `protobuf:"bytes,3,opt,name=nodo,proto3" json:"nodo,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -445,6 +446,13 @@ func (x *Event) GetId() int32 {
 func (x *Event) GetValue() string {
 	if x != nil {
 		return x.Value
+	}
+	return ""
+}
+
+func (x *Event) GetNodo() string {
+	if x != nil {
+		return x.Nodo
 	}
 	return ""
 }
@@ -525,10 +533,11 @@ const file_proto_nodo_proto_rawDesc = "" +
 	"\x02ok\x18\x01 \x01(\bR\x02ok\";\n" +
 	"\x12CoordinatorMessage\x12%\n" +
 	"\x0ecoordinator_id\x18\x01 \x01(\x05R\rcoordinatorId\"\a\n" +
-	"\x05Empty\"-\n" +
+	"\x05Empty\"A\n" +
 	"\x05Event\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x05R\x02id\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value\"Z\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value\x12\x12\n" +
+	"\x04nodo\x18\x03 \x01(\tR\x04nodo\"Z\n" +
 	"\x04Logs\x12'\n" +
 	"\x0fsequence_number\x18\x01 \x01(\x05R\x0esequenceNumber\x12)\n" +
 	"\tevent_log\x18\x02 \x03(\v2\f.proto.EventR\beventLog2\x94\x02\n" +

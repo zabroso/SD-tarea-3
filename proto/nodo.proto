@@ -49,6 +49,7 @@ message Empty {}
 message Event {
   int32 id = 1;
   string value = 2;
+  string nodo = 3;
 }
 
 message Logs {

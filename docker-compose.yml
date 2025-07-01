@@ -58,7 +58,7 @@ services:
       PORT_VM1: "5001"
       PORT_VM2: "5002"
       PORT_VM3: "5003"
-      IS_PRIMARY: "false"
+      IS_PRIMARY: "true"
     ports:
       - "5003:5003"
     networks:
