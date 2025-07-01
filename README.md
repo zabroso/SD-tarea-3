@@ -16,7 +16,7 @@
   * Docker (Idealmente Docker Desktop para mayor comodidad: https://docs.docker.com/desktop/ , sino el Docker Engine: https://docs.docker.com/engine/install/)
   * WSL
 
-Para poder montar el sistema se debe ejecutar el siguiente comando:
+Para poder montar el sistema, deben estar en la rama `main` del repositorio y se debe ejecutar el siguiente comando:
 
     docker-compose up -d --build
 
